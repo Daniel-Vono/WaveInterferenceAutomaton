@@ -32,7 +32,9 @@ public class Game1 : Game
 
     private Texture2D tileImg;
 
-    private Tile[,] grid;
+    public static Tile[,] Grid { get; private set; }
+
+    public static byte GlobalUpdateId { get; private set; }
 
     public Game1()
     {
@@ -54,6 +56,8 @@ public class Game1 : Game
         graphics.ApplyChanges();
 
         base.Initialize();
+
+        GlobalUpdateId = 0;
     }
 
     /// <summary>
@@ -69,27 +73,31 @@ public class Game1 : Game
         Color[] data = new Color[Tile.DIMENSION * Tile.DIMENSION];
         for (int i = 0; i < data.Length; i++)
         {
-            if(i % Tile.DIMENSION == 0)
+            /*if(i % Tile.DIMENSION == 0)
             {
                 data[i] = new Color(0, 0, 0, 255);
             }
             else
             {
                 data[i] = new Color(205, 0, 0, i);
-            }
-            
+            }*/
+
+            data[i] = new Color(255, 255, 255, 255);
+
         }
         tileImg.SetData(data);
 
 
-        grid = new Tile[gridHeight, gridWidth];
+        Grid = new Tile[gridHeight, gridWidth];
         for (byte row = 0; row < gridHeight; row++)
         {
             for (byte column = 0; column < gridWidth; column++)
             {
-                grid[row, column] = new Tile(row, column);
+                Grid[row, column] = new OpenTile(row, column);
             }
         }
+
+        Grid[16, 0].AddParticle(PropagationState.Right, 10, GlobalUpdateId);
     }
 
     /// <summary>
@@ -116,7 +124,21 @@ public class Game1 : Game
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
 
-        // TODO: Add your update logic here
+        if (Keyboard.GetState().IsKeyDown(Keys.Space))
+        {
+            // TODO: Add your update logic here
+            for (int height = 0; height < gridHeight; height++)
+            {
+                for (int width = 0; width < gridWidth; width++)
+                {
+                    Grid[height, width].Update();
+                }
+            }
+
+            GlobalUpdateId += 1;
+        }
+
+
 
         base.Update(gameTime);
     }
@@ -135,7 +157,7 @@ public class Game1 : Game
         {
             for (int j = 0; j < gridWidth; j++)
             {
-                spriteBatch.Draw(tileImg, grid[i,j].Rect, Color.White);
+                spriteBatch.Draw(tileImg, Grid[i,j].Rect, Color.White * Grid[i,j].Superposition());
             }
         }
 

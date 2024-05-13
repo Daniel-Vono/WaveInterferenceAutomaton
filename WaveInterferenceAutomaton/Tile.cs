@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 using Microsoft.Xna.Framework;
 
-class Tile
+public abstract class Tile
 {
     public const byte DIMENSION = 8;
 
@@ -26,5 +26,11 @@ class Tile
 
         Rect = new Rectangle(column * DIMENSION, row * DIMENSION, DIMENSION, DIMENSION);
     }
+
+    public abstract void Update();
+
+    public abstract void AddParticle(PropagationState state, float energyLevel, byte updateId);
+
+    public abstract float Superposition();
 }
 
