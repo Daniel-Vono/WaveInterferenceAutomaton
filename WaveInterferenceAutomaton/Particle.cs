@@ -30,7 +30,7 @@ class Particle
 
     private const float ENERGY_DISSIPATION = 0.75f;
     private const float ENERGY_DISSIPATION_DIAG = ENERGY_DISSIPATION * 0.85f;
-    private const float ENERGY_TOLERANCE = 0.05f; //0.005f;
+    private const float ENERGY_TOLERANCE = 0.005f; //0.005f;
 
     public byte UpdateId { get; private set; }
     private PropagationState emitterState;

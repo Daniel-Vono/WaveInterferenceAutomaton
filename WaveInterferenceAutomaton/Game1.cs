@@ -103,7 +103,33 @@ public class Game1 : Game
             }
         }
 
-        Grid[17, 7] = new Emitter(17, 7, new PropagationState[] { PropagationState.Right, PropagationState.Left}, 200);
+        Grid[17, 7] = new Emitter(17, 7, new PropagationState[] { PropagationState.Right}, 200);
+
+        for (byte i = 11; i < 11 + 5; i++)
+        {
+            Grid[i, 12] = new AbsorbWall(i, 12);
+        }
+
+        for (byte i = 19; i < 19 + 5; i++)
+        {
+            Grid[i, 12] = new AbsorbWall(i, 12);
+        }
+
+        for (byte i = 7; i < 7 + 5; i++)
+        {
+            Grid[i, 16] = new AbsorbWall(i, 16);
+        }
+
+        for (byte i = 15; i < 15 + 5; i++)
+        {
+            Grid[i, 16] = new AbsorbWall(i, 16);
+        }
+
+        for (byte i = 23; i < 23 + 5; i++)
+        {
+            Grid[i, 16] = new AbsorbWall(i, 16);
+        }
+
 
     }
 
@@ -161,11 +187,22 @@ public class Game1 : Game
 
         spriteBatch.Begin();
 
+        float opacity = 0f;
+
         for (int i = 0; i < gridHeight; i++)
         {
             for (int j = 0; j < gridWidth; j++)
             {
-                spriteBatch.Draw(tileImg, Grid[i,j].Rect, Color.White * Grid[i,j].Superposition());
+                opacity = Grid[i, j].Superposition();
+
+                if (opacity == AbsorbWall.SUPERPOSITION)
+                {
+                    spriteBatch.Draw(tileImg, Grid[i, j].Rect, Color.Yellow);
+                }
+                else
+                {
+                    spriteBatch.Draw(tileImg, Grid[i, j].Rect, Color.White * opacity);
+                }
             }
         }
 
