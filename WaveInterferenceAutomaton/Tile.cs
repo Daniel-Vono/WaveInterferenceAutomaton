@@ -27,9 +27,9 @@ public abstract class Tile
         Rect = new Rectangle(column * DIMENSION, row * DIMENSION, DIMENSION, DIMENSION);
     }
 
-    public abstract void Update();
+    public abstract void Update(double elapsedTotalMilliseconds);
 
-    public abstract void AddParticle(PropagationState state, float energyLevel, byte updateId);
+    public abstract void AddParticle(PropagationState state, PropagationState emitterState, float energyLevel, byte updateId);
 
     public abstract float Superposition();
 }

@@ -24,8 +24,10 @@ public class Game1 : Game
     private static byte gridHeight = 32;
 
     private const int UI_WIDTH = 128;
-    private readonly static int SCREEN_WIDTH = gridWidth * Tile.DIMENSION + UI_WIDTH;
-    private readonly static int SCREEN_HEIGHT = gridHeight * Tile.DIMENSION;
+    private static readonly int SCREEN_WIDTH = gridWidth * Tile.DIMENSION + UI_WIDTH;
+    private static readonly int SCREEN_HEIGHT = gridHeight * Tile.DIMENSION;
+
+    private static readonly Rectangle uiBgRect = new Rectangle(gridWidth * Tile.DIMENSION, 0, UI_WIDTH, SCREEN_HEIGHT);
 
     private GraphicsDeviceManager graphics;
     private SpriteBatch spriteBatch;
@@ -35,6 +37,8 @@ public class Game1 : Game
     public static Tile[,] Grid { get; private set; }
 
     public static byte GlobalUpdateId { get; private set; }
+
+    private Timer updateTimer;
 
     public Game1()
     {
@@ -58,6 +62,18 @@ public class Game1 : Game
         base.Initialize();
 
         GlobalUpdateId = 0;
+
+        updateTimer = new Timer(800, true);
+    }
+
+    public static byte GetGridWidth()
+    {
+        return gridWidth;
+    }
+
+    public static byte GetGridHeight()
+    {
+        return gridHeight;
     }
 
     /// <summary>
@@ -73,17 +89,7 @@ public class Game1 : Game
         Color[] data = new Color[Tile.DIMENSION * Tile.DIMENSION];
         for (int i = 0; i < data.Length; i++)
         {
-            /*if(i % Tile.DIMENSION == 0)
-            {
-                data[i] = new Color(0, 0, 0, 255);
-            }
-            else
-            {
-                data[i] = new Color(205, 0, 0, i);
-            }*/
-
             data[i] = new Color(255, 255, 255, 255);
-
         }
         tileImg.SetData(data);
 
@@ -97,7 +103,8 @@ public class Game1 : Game
             }
         }
 
-        Grid[16, 0].AddParticle(PropagationState.Right, 10, GlobalUpdateId);
+        Grid[17, 7] = new Emitter(17, 7, new PropagationState[] { PropagationState.Right, PropagationState.Left}, 200);
+
     }
 
     /// <summary>
@@ -124,21 +131,22 @@ public class Game1 : Game
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
 
-        if (Keyboard.GetState().IsKeyDown(Keys.Space))
+        updateTimer.Update(gameTime.ElapsedGameTime.TotalMilliseconds);
+
+        if (updateTimer.IsFinished())
         {
             // TODO: Add your update logic here
             for (int height = 0; height < gridHeight; height++)
             {
                 for (int width = 0; width < gridWidth; width++)
                 {
-                    Grid[height, width].Update();
+                    Grid[height, width].Update(gameTime.ElapsedGameTime.TotalMilliseconds);
                 }
             }
 
             GlobalUpdateId += 1;
+            updateTimer.ResetTimer(true);
         }
-
-
 
         base.Update(gameTime);
     }
@@ -149,7 +157,7 @@ public class Game1 : Game
     /// <param name="gameTime">Provides a snapshot of timing values.</param>
     protected override void Draw(GameTime gameTime)
     {
-        GraphicsDevice.Clear(Color.CornflowerBlue);
+        GraphicsDevice.Clear(Color.Black);
 
         spriteBatch.Begin();
 
@@ -160,6 +168,8 @@ public class Game1 : Game
                 spriteBatch.Draw(tileImg, Grid[i,j].Rect, Color.White * Grid[i,j].Superposition());
             }
         }
+
+        spriteBatch.Draw(tileImg, uiBgRect, Color.Brown);
 
         spriteBatch.End();
 

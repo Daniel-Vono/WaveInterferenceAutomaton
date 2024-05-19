@@ -24,30 +24,210 @@ public enum PropagationState
 
 class Particle
 {
-    private const float ENERGY_DISSIPATION = 0.5f;
-    private const float ENERGY_TOLERANCE = 0.05f;
+    //The starting energy value of a particle
+    //This value must be 1 for drawing to work as intended
+    public const float STARTING_ENERGY = 1;
+
+    private const float ENERGY_DISSIPATION = 0.75f;
+    private const float ENERGY_DISSIPATION_DIAG = ENERGY_DISSIPATION * 0.85f;
+    private const float ENERGY_TOLERANCE = 0.05f; //0.005f;
 
     public byte UpdateId { get; private set; }
+    private PropagationState emitterState;
     private PropagationState state;
     private Tuple<byte, byte> gridLoc;
 
     public float ELevel { get; private set; }
 
-    public Particle(PropagationState state, float energyLevel, byte gridX, byte gridY, byte updateId)
+    public Particle(PropagationState state, PropagationState emitterState, float energyLevel, byte gridY, byte gridX, byte updateId)
     {
         UpdateId = updateId;
 
         this.state = state;
+        this.emitterState = emitterState;
         ELevel = energyLevel;
 
-        gridLoc = new Tuple<byte, byte>(gridX, gridY);
+        gridLoc = new Tuple<byte, byte>(gridY, gridX);
     }
 
-    private void CopyParticle(PropagationState newState,short xShift, short yShift)
+    private float CalcNewEnergyLevel()
+    {
+        bool similarDirection = false;
+
+        //TODO: Add all cases
+
+        switch(emitterState)
+        {
+            case PropagationState.Right:
+
+                if(state == PropagationState.Right || state == PropagationState.UpRight || state == PropagationState.DownRight)
+                {
+                    similarDirection = true;
+                }
+                else
+                {
+                    similarDirection = false;
+                }
+                break;
+
+            case PropagationState.Left:
+
+                if (state == PropagationState.Left || state == PropagationState.UpLeft || state == PropagationState.DownLeft)
+                {
+                    similarDirection = true;
+                }
+                else
+                {
+                    similarDirection = false;
+                }
+
+                break;
+
+            case PropagationState.Up:
+
+                if (state == PropagationState.Up || state == PropagationState.UpLeft || state == PropagationState.UpRight)
+                {
+                    similarDirection = true;
+                }
+                else
+                {
+                    similarDirection = false;
+                }
+
+                break;
+
+            case PropagationState.Down:
+
+                if (state == PropagationState.Down || state == PropagationState.DownLeft || state == PropagationState.DownRight)
+                {
+                    similarDirection = true;
+                }
+                else
+                {
+                    similarDirection = false;
+                }
+
+                break;
+
+            case PropagationState.UpRight:
+
+                if (state == PropagationState.UpRight || state == PropagationState.Right || state == PropagationState.Up)
+                {
+                    similarDirection = true;
+                }
+                else
+                {
+                    similarDirection = false;
+                }
+                break;
+
+            case PropagationState.DownRight:
+
+                if (state == PropagationState.DownRight || state == PropagationState.Right || state == PropagationState.Down)
+                {
+                    similarDirection = true;
+                }
+                else
+                {
+                    similarDirection = false;
+                }
+                break;
+        }
+
+        if(similarDirection) return ELevel * ENERGY_DISSIPATION;
+
+        return ELevel * ENERGY_DISSIPATION * 0.25f;
+    }
+
+    private void CopyParticle(PropagationState newState)
     {
         //TODO: Check if valid indices
 
-        Game1.Grid[gridLoc.Item1 + yShift, gridLoc.Item2 + xShift].AddParticle(newState, ELevel * ENERGY_DISSIPATION, (byte)(UpdateId + 1));
+        int yIndex;
+        int xIndex;
+
+        switch (newState)
+        {
+            case PropagationState.Up:
+
+                yIndex = gridLoc.Item1 - 1;
+                xIndex = gridLoc.Item2;
+
+                if (yIndex < 0 || yIndex >= Game1.GetGridHeight() || xIndex < 0 || xIndex >= Game1.GetGridWidth()) return;
+
+                Game1.Grid[yIndex, xIndex].AddParticle(newState, emitterState, CalcNewEnergyLevel(), (byte)(UpdateId + 1));
+                break;
+
+            case PropagationState.Down:
+
+                yIndex = gridLoc.Item1 + 1;
+                xIndex = gridLoc.Item2;
+
+                if (yIndex < 0 || yIndex >= Game1.GetGridHeight() || xIndex < 0 || xIndex >= Game1.GetGridWidth()) return;
+
+                Game1.Grid[yIndex, xIndex].AddParticle(newState, emitterState, CalcNewEnergyLevel(), (byte)(UpdateId + 1));
+                break;
+
+            case PropagationState.Left:
+
+                yIndex = gridLoc.Item1;
+                xIndex = gridLoc.Item2 - 1;
+
+                if (yIndex < 0 || yIndex >= Game1.GetGridHeight() || xIndex < 0 || xIndex >= Game1.GetGridWidth()) return;
+
+                Game1.Grid[yIndex, xIndex].AddParticle(newState, emitterState, CalcNewEnergyLevel(), (byte)(UpdateId + 1));
+                break;
+
+            case PropagationState.Right:
+
+                yIndex = gridLoc.Item1;
+                xIndex = gridLoc.Item2 + 1;
+
+                if (yIndex < 0 || yIndex >= Game1.GetGridHeight() || xIndex < 0 || xIndex >= Game1.GetGridWidth()) return;
+
+                Game1.Grid[yIndex, xIndex].AddParticle(newState, emitterState, CalcNewEnergyLevel(), (byte)(UpdateId + 1));
+                break;
+
+            case PropagationState.UpRight:
+
+                yIndex = gridLoc.Item1 - 1;
+                xIndex = gridLoc.Item2 + 1;
+
+                if (yIndex < 0 || yIndex >= Game1.GetGridHeight() || xIndex < 0 || xIndex >= Game1.GetGridWidth()) return;
+
+                Game1.Grid[yIndex, xIndex].AddParticle(newState, emitterState, CalcNewEnergyLevel(), (byte)(UpdateId + 1));
+                break;
+
+            case PropagationState.DownRight:
+
+                yIndex = gridLoc.Item1 + 1;
+                xIndex = gridLoc.Item2 + 1;
+
+                if (yIndex < 0 || yIndex >= Game1.GetGridHeight() || xIndex < 0 || xIndex >= Game1.GetGridWidth()) return;
+
+                Game1.Grid[yIndex, xIndex].AddParticle(newState, emitterState, CalcNewEnergyLevel(), (byte)(UpdateId + 1));
+                break;
+
+            case PropagationState.DownLeft:
+
+                yIndex = gridLoc.Item1 + 1;
+                xIndex = gridLoc.Item2 - 1;
+
+                if (yIndex < 0 || yIndex >= Game1.GetGridHeight() || xIndex < 0 || xIndex >= Game1.GetGridWidth()) return;
+
+                Game1.Grid[yIndex, xIndex].AddParticle(newState, emitterState, CalcNewEnergyLevel(), (byte)(UpdateId + 1));
+                break;
+
+            case PropagationState.UpLeft:
+
+                yIndex = gridLoc.Item1 - 1;
+                xIndex = gridLoc.Item2 - 1;
+
+                if (yIndex < 0 || yIndex >= Game1.GetGridHeight() || xIndex < 0 || xIndex >= Game1.GetGridWidth()) return;
+
+                Game1.Grid[yIndex, xIndex].AddParticle(newState, emitterState, CalcNewEnergyLevel(), (byte)(UpdateId + 1));
+                break;
+        }
     }
 
     public void Update()
@@ -58,42 +238,51 @@ class Particle
         switch(state)
         {
             case PropagationState.Up:
-                CopyParticle(PropagationState.UpLeft, -1, -1);
-                CopyParticle(PropagationState.Up, 0, -1);
-                CopyParticle(PropagationState.UpRight, 1, -1);
+                CopyParticle(PropagationState.UpLeft);
+                CopyParticle(PropagationState.Up);
+                CopyParticle(PropagationState.UpRight);
                 break;
 
             case PropagationState.Down:
-                CopyParticle(PropagationState.DownLeft, -1, 1);
-                CopyParticle(PropagationState.Down, 0, 1);
-                CopyParticle(PropagationState.DownRight, 1, 1);
+                CopyParticle(PropagationState.DownLeft);
+                CopyParticle(PropagationState.Down);
+                CopyParticle(PropagationState.DownRight);
                 break;
 
             case PropagationState.Left:
+                CopyParticle(PropagationState.UpLeft);
+                CopyParticle(PropagationState.Left);
+                CopyParticle(PropagationState.DownLeft);
                 break;
 
             case PropagationState.Right:
-                CopyParticle(PropagationState.UpRight, 1, -1);
-                CopyParticle(PropagationState.Right, 1, 0);
-                CopyParticle(PropagationState.DownRight, 1, 1);
+                CopyParticle(PropagationState.UpRight);
+                CopyParticle(PropagationState.Right);
+                CopyParticle(PropagationState.DownRight);
                 break;
 
             case PropagationState.UpRight:
-                CopyParticle(PropagationState.Up, 0, -1);
-                CopyParticle(PropagationState.UpRight, 1, -1);
-                CopyParticle(PropagationState.Right, 1, 0);
+                CopyParticle(PropagationState.Up);
+                CopyParticle(PropagationState.UpRight);
+                CopyParticle(PropagationState.Right);
                 break;
 
             case PropagationState.DownRight:
-                CopyParticle(PropagationState.Down, 0, 1);
-                CopyParticle(PropagationState.DownRight, 1, 1);
-                CopyParticle(PropagationState.Right, 1, 0);
+                CopyParticle(PropagationState.Down);
+                CopyParticle(PropagationState.DownRight);
+                CopyParticle(PropagationState.Right);
                 break;
 
             case PropagationState.DownLeft:
+                CopyParticle(PropagationState.Down);
+                CopyParticle(PropagationState.DownLeft);
+                CopyParticle(PropagationState.Left);
                 break;
 
             case PropagationState.UpLeft:
+                CopyParticle(PropagationState.Up);
+                CopyParticle(PropagationState.UpLeft);
+                CopyParticle(PropagationState.Left);
                 break;
         }
     }

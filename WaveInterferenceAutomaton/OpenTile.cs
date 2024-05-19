@@ -13,6 +13,8 @@ using Microsoft.Xna.Framework;
 
 class OpenTile : Tile
 {
+    public const float REASONABLE_MAX_ENERGY = Particle.STARTING_ENERGY * 2;
+
     protected LList<Particle> particles = new LList<Particle>();
 
     public OpenTile(byte row, byte column) : base(row, column)
@@ -20,7 +22,7 @@ class OpenTile : Tile
 
     }
 
-    public override void Update()
+    public override void Update(double elapsedTotalMilliseconds)
     {
         Node<Particle> currPart = particles.Head;
         Node<Particle> prevPart = null;
@@ -46,9 +48,9 @@ class OpenTile : Tile
         }
     }
 
-    public override void AddParticle(PropagationState state, float energyLevel, byte updateId)
+    public override void AddParticle(PropagationState state, PropagationState emitterState, float energyLevel, byte updateId)
     {
-        particles.AddToTail(new Particle(state, energyLevel, row, column, updateId));
+        particles.AddToTail(new Particle(state, emitterState, energyLevel, row, column, updateId));
     }
 
     public override float Superposition()
