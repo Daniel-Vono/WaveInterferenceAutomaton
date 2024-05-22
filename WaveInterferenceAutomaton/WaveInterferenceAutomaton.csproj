@@ -54,6 +54,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Action.cs" />
     <Compile Include="Emitter.cs" />
     <Compile Include="Game1.cs" />
     <Compile Include="LList.cs" />

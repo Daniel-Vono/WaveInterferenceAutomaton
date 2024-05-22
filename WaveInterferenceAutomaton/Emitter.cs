@@ -9,9 +9,9 @@ using GameUtility;
 class Emitter : OpenTile
 {
 
-    Timer emittTimer;
+    private Timer emittTimer;
 
-    PropagationState[] dirs;
+    private PropagationState[] dirs;
 
     /// <summary>
     /// 

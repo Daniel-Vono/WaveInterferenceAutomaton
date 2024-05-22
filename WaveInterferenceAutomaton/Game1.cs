@@ -29,6 +29,10 @@ public class Game1 : Game
 
     private static readonly Rectangle uiBgRect = new Rectangle(gridWidth * Tile.DIMENSION, 0, UI_WIDTH, SCREEN_HEIGHT);
 
+    const int LEFT_MOUSE = 0;
+    const int RIGHT_MOUSE = 1;
+    const int MIDDLE_MOUSE = 2;
+
     private GraphicsDeviceManager graphics;
     private SpriteBatch spriteBatch;
 
@@ -39,6 +43,13 @@ public class Game1 : Game
     public static byte GlobalUpdateId { get; private set; }
 
     private Timer updateTimer;
+
+    private MouseState mouse;
+    private MouseState prevMouse;
+
+    private Queue<Action> pending = new Queue<Action>();
+    private List<Tuple<byte, byte>> usedCoords;
+    private Action dequeuedAction;
 
     public Game1()
     {
@@ -60,6 +71,9 @@ public class Game1 : Game
         graphics.ApplyChanges();
 
         base.Initialize();
+
+        //Makes the mouse visible
+        IsMouseVisible = true;
 
         GlobalUpdateId = 0;
 
@@ -161,6 +175,57 @@ public class Game1 : Game
 
         if (updateTimer.IsFinished())
         {
+            usedCoords = new List<Tuple<byte, byte>>();
+
+            while (pending.Count != 0)
+            {
+                dequeuedAction = pending.Dequeue();
+
+                for (byte i = 0; i < usedCoords.Count; i++)
+                {
+                    if(dequeuedAction.Coord.Equals(usedCoords[i]))
+                    {
+                        continue;
+                    }
+                }
+
+                switch(dequeuedAction.Type)
+                {
+                    case Action.ActionType.Waves:
+                        Grid[dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2].AddParticle(PropagationState.Right, PropagationState.Right, Particle.STARTING_ENERGY, (byte)(GlobalUpdateId + 1));
+                        Grid[dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2].AddParticle(PropagationState.Left, PropagationState.Left, Particle.STARTING_ENERGY, (byte)(GlobalUpdateId + 1));
+                        break;
+
+                    case Action.ActionType.AbsorbWall:
+
+                        if(Grid[dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2] is OpenTile)
+                        {
+                            Grid[dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2] = new AbsorbWall(dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2);
+                        }
+                        else
+                        {
+                            Grid[dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2] = new OpenTile(dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2);
+                        }
+                        break;
+
+                    case Action.ActionType.Emitter:
+
+                        if (Grid[dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2] is OpenTile)
+                        {
+                            Grid[dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2] = new Emitter(dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2, new PropagationState[] { PropagationState.Right, PropagationState.Left}, 800);
+                        }
+                        else
+                        {
+                            Grid[dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2] = new OpenTile(dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2);
+                        }
+
+                        break;
+                }
+
+                usedCoords.Add(dequeuedAction.Coord);
+            }
+
+
             // TODO: Add your update logic here
             for (int height = 0; height < gridHeight; height++)
             {
@@ -172,6 +237,40 @@ public class Game1 : Game
 
             GlobalUpdateId += 1;
             updateTimer.ResetTimer(true);
+        }
+
+        prevMouse = mouse;
+        mouse = Mouse.GetState();
+
+        if(IsMouseButtonPressed(LEFT_MOUSE, mouse) && IsMouseButtonReleased(LEFT_MOUSE, prevMouse))
+        {
+            Tuple<byte, byte> coord = MousePosToCoord(mouse);
+
+            if(coord.Item1 >= 0 && coord.Item1 <= gridHeight 
+                && coord.Item2 >= 0 && coord.Item2 <= gridWidth)
+            {
+                pending.Enqueue(new Action(coord, Action.ActionType.Waves));
+            }
+        }
+        else if (IsMouseButtonPressed(RIGHT_MOUSE, mouse) && IsMouseButtonReleased(RIGHT_MOUSE, prevMouse))
+        {
+            Tuple<byte, byte> coord = MousePosToCoord(mouse);
+
+            if (coord.Item1 >= 0 && coord.Item1 <= gridHeight
+                && coord.Item2 >= 0 && coord.Item2 <= gridWidth)
+            {
+                pending.Enqueue(new Action(coord, Action.ActionType.AbsorbWall));
+            }
+        }
+        else if (IsMouseButtonPressed(MIDDLE_MOUSE, mouse) && IsMouseButtonReleased(MIDDLE_MOUSE, prevMouse))
+        {
+            Tuple<byte, byte> coord = MousePosToCoord(mouse);
+
+            if (coord.Item1 >= 0 && coord.Item1 <= gridHeight
+                && coord.Item2 >= 0 && coord.Item2 <= gridWidth)
+            {
+                pending.Enqueue(new Action(coord, Action.ActionType.Emitter));
+            }
         }
 
         base.Update(gameTime);
@@ -199,6 +298,10 @@ public class Game1 : Game
                 {
                     spriteBatch.Draw(tileImg, Grid[i, j].Rect, Color.Yellow);
                 }
+                else if(Grid[i, j] is Emitter)
+                {
+                    spriteBatch.Draw(tileImg, Grid[i, j].Rect, Color.Purple);
+                }
                 else
                 {
                     spriteBatch.Draw(tileImg, Grid[i, j].Rect, Color.White * opacity);
@@ -211,5 +314,59 @@ public class Game1 : Game
         spriteBatch.End();
 
         base.Draw(gameTime);
+    }
+
+    //Pre: The mouse button number and the state of the mouse
+    //Post: If the mouse button is pressed
+    //Desc: Checks if a sepcific mouse button is pressed
+    private static bool IsMouseButtonPressed(byte index, MouseState mouse)
+    {
+        //Chooses which mouse button to check based on the index
+        switch (index)
+        {
+            case LEFT_MOUSE:
+                //Returns if the left mouse button is pressed
+                return mouse.LeftButton == ButtonState.Pressed;
+
+            case RIGHT_MOUSE:
+                //Returns if the right mouse button is pressed
+                return mouse.RightButton == ButtonState.Pressed;
+
+            case MIDDLE_MOUSE:
+                //Returns if the right mouse button is pressed
+                return mouse.MiddleButton == ButtonState.Pressed;
+
+            default:
+                //Throws an exception if no valid index was given
+                throw new EntryPointNotFoundException("Invalid index passed.");
+        }
+    }
+
+    private static bool IsMouseButtonReleased(byte index, MouseState mouse)
+    {
+        //Chooses which mouse button to check based on the index
+        switch (index)
+        {
+            case LEFT_MOUSE:
+                //Returns if the left mouse button is released
+                return mouse.LeftButton == ButtonState.Released;
+
+            case RIGHT_MOUSE:
+                //Returns if the right mouse button is released
+                return mouse.RightButton == ButtonState.Released;
+
+            case MIDDLE_MOUSE:
+                //Returns if the right mouse button is released
+                return mouse.MiddleButton == ButtonState.Released;
+
+            default:
+                //Throws an exception if no valid index was given
+                throw new EntryPointNotFoundException("Invalid index passed.");
+        }
+    }
+
+    private static Tuple<byte, byte> MousePosToCoord(MouseState mouse)
+    {
+        return new Tuple<byte, byte>((byte)(mouse.Y / Tile.DIMENSION), (byte)(mouse.X / Tile.DIMENSION));
     }
 }
