@@ -2,15 +2,6 @@
 // Creation Date: May. 03, 2024
 // Description: An open tile that can hold particles
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-using Microsoft.Xna.Framework;
-
-
 class OpenTile : Tile
 {
     public const float REASONABLE_MAX_ENERGY = Particle.STARTING_ENERGY * 2;
@@ -48,20 +39,13 @@ class OpenTile : Tile
         }
     }
 
-    public override void AddParticle(PropagationState state, PropagationState emitterState, float energyLevel, byte updateId)
+    public override void AddParticle(PropagationState state, PropagationState emitterState, float energyLevel, byte updateId, bool superpositionAccountedFor = true)
     {
-        particles.AddToTail(new Particle(state, emitterState, energyLevel, row, column, updateId));
+        particles.AddToTail(new Particle(state, emitterState, energyLevel, row, column, updateId, superpositionAccountedFor));
     }
 
     public override float Superposition()
     {
-        float superposition = 0;
-
-        particles.IterateGeneric((LList<Particle> List, Node<Particle> node, short index) =>
-        {
-            superposition += node.Value.ELevel;
-        });
-
-        return superposition;
+        return float.NaN;
     }
 }

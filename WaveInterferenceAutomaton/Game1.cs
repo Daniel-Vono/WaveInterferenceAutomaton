@@ -2,17 +2,14 @@
 // Creation Date: Apr. 29, 2024
 // Description: The driver class
 
-using GameUtility;
+using System;
+using System.Collections.Generic;
+
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using Microsoft.Xna.Framework.Media;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+
+using GameUtility;
 
 /// <summary>
 /// This is the main type for your game.
@@ -20,25 +17,33 @@ using System.Linq;
 public class Game1 : Game
 {
 
-    private static byte gridWidth = 48;
-    private static byte gridHeight = 32;
+    private static byte gridWidth = 24;
+    private static byte gridHeight = 23;
 
-    private const int UI_WIDTH = 128;
+    private const int UI_WIDTH = 192;
     private static readonly int SCREEN_WIDTH = gridWidth * Tile.DIMENSION + UI_WIDTH;
     private static readonly int SCREEN_HEIGHT = gridHeight * Tile.DIMENSION;
 
     private static readonly Rectangle uiBgRect = new Rectangle(gridWidth * Tile.DIMENSION, 0, UI_WIDTH, SCREEN_HEIGHT);
 
-    const int LEFT_MOUSE = 0;
-    const int RIGHT_MOUSE = 1;
-    const int MIDDLE_MOUSE = 2;
+    private const int LEFT_MOUSE = 0;
+    private const int RIGHT_MOUSE = 1;
+    private const int MIDDLE_MOUSE = 2;
+
+    private const string INSTRUCTIONS_TEXT = "0: Reset\n1: Two Point Interference\n2: Double Slit\n\nLeft Click: Wave\nMid Click: Emitter\nRight Click: Toggle Wall";
+    private readonly Vector2 instructionsTextPos = new Vector2(gridWidth * Tile.DIMENSION + 5, 5);
+
+    public const short UPDATE_TIMER_TIME = 60;
 
     private GraphicsDeviceManager graphics;
     private SpriteBatch spriteBatch;
 
     private Texture2D tileImg;
 
+    private SpriteFont msgFont;
+
     public static Tile[,] Grid { get; private set; }
+    public static float[,] Superpositions { get; private set; }
 
     public static byte GlobalUpdateId { get; private set; }
 
@@ -46,6 +51,9 @@ public class Game1 : Game
 
     private MouseState mouse;
     private MouseState prevMouse;
+
+    private KeyboardState kb;
+    private KeyboardState prevKb;
 
     private Queue<Action> pending = new Queue<Action>();
     private List<Tuple<byte, byte>> usedCoords;
@@ -77,7 +85,7 @@ public class Game1 : Game
 
         GlobalUpdateId = 0;
 
-        updateTimer = new Timer(800, true);
+        usedCoords = new List<Tuple<byte, byte>>();
     }
 
     public static byte GetGridWidth()
@@ -107,8 +115,21 @@ public class Game1 : Game
         }
         tileImg.SetData(data);
 
+        msgFont = Content.Load<SpriteFont>("Fonts/MsgFont");
 
         Grid = new Tile[gridHeight, gridWidth];
+
+        updateTimer = new Timer(UPDATE_TIMER_TIME, true);
+
+        ClearGrid();
+    }
+
+    private void ClearGrid()
+    {
+        updateTimer.ResetTimer(true);
+
+        Superpositions = new float[gridHeight, gridWidth];
+
         for (byte row = 0; row < gridHeight; row++)
         {
             for (byte column = 0; column < gridWidth; column++)
@@ -116,35 +137,6 @@ public class Game1 : Game
                 Grid[row, column] = new OpenTile(row, column);
             }
         }
-
-        Grid[17, 7] = new Emitter(17, 7, new PropagationState[] { PropagationState.Right}, 200);
-
-        for (byte i = 11; i < 11 + 5; i++)
-        {
-            Grid[i, 12] = new AbsorbWall(i, 12);
-        }
-
-        for (byte i = 19; i < 19 + 5; i++)
-        {
-            Grid[i, 12] = new AbsorbWall(i, 12);
-        }
-
-        for (byte i = 7; i < 7 + 5; i++)
-        {
-            Grid[i, 16] = new AbsorbWall(i, 16);
-        }
-
-        for (byte i = 15; i < 15 + 5; i++)
-        {
-            Grid[i, 16] = new AbsorbWall(i, 16);
-        }
-
-        for (byte i = 23; i < 23 + 5; i++)
-        {
-            Grid[i, 16] = new AbsorbWall(i, 16);
-        }
-
-
     }
 
     /// <summary>
@@ -168,15 +160,28 @@ public class Game1 : Game
     /// <param name="gameTime">Provides a snapshot of timing values.</param>
     protected override void Update(GameTime gameTime)
     {
-        if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
-            Exit();
+        if (kb.IsKeyDown(Keys.Escape)) Exit();
 
         updateTimer.Update(gameTime.ElapsedGameTime.TotalMilliseconds);
 
+        prevMouse = mouse;
+        mouse = Mouse.GetState();
+
+        prevKb = kb;
+        kb = Keyboard.GetState();
+
+        if (NewKeyPress(Keys.D0)) ClearGrid();
+        else if (NewKeyPress(Keys.D1)) AddTwoPointSourceInterference();
+        else if (NewKeyPress(Keys.D2)) AddDoubleSlit();
+
+        #region Simulation Update
+
         if (updateTimer.IsFinished())
         {
-            usedCoords = new List<Tuple<byte, byte>>();
+            usedCoords.Clear();
 
+            #region Do All Pending Actions
+            
             while (pending.Count != 0)
             {
                 dequeuedAction = pending.Dequeue();
@@ -201,10 +206,12 @@ public class Game1 : Game
                         if(Grid[dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2] is OpenTile)
                         {
                             Grid[dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2] = new AbsorbWall(dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2);
+                            Superpositions[dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2] = AbsorbWall.SUPERPOSITION;
                         }
                         else
                         {
                             Grid[dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2] = new OpenTile(dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2);
+                            Superpositions[dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2] = 0f;
                         }
                         break;
 
@@ -212,7 +219,7 @@ public class Game1 : Game
 
                         if (Grid[dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2] is OpenTile)
                         {
-                            Grid[dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2] = new Emitter(dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2, new PropagationState[] { PropagationState.Right, PropagationState.Left}, 800);
+                            Grid[dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2] = new Emitter(dequeuedAction.Coord.Item1, dequeuedAction.Coord.Item2, new PropagationState[] { PropagationState.Right/*, PropagationState.Left*/}, 800);
                         }
                         else
                         {
@@ -224,9 +231,10 @@ public class Game1 : Game
 
                 usedCoords.Add(dequeuedAction.Coord);
             }
+            
+            #endregion
 
-
-            // TODO: Add your update logic here
+            //Updates each tile
             for (int height = 0; height < gridHeight; height++)
             {
                 for (int width = 0; width < gridWidth; width++)
@@ -239,8 +247,7 @@ public class Game1 : Game
             updateTimer.ResetTimer(true);
         }
 
-        prevMouse = mouse;
-        mouse = Mouse.GetState();
+        #endregion
 
         if(IsMouseButtonPressed(LEFT_MOUSE, mouse) && IsMouseButtonReleased(LEFT_MOUSE, prevMouse))
         {
@@ -286,15 +293,12 @@ public class Game1 : Game
 
         spriteBatch.Begin();
 
-        float opacity = 0f;
-
         for (int i = 0; i < gridHeight; i++)
         {
             for (int j = 0; j < gridWidth; j++)
             {
-                opacity = Grid[i, j].Superposition();
 
-                if (opacity == AbsorbWall.SUPERPOSITION)
+                if (Superpositions[i,j] == AbsorbWall.SUPERPOSITION)
                 {
                     spriteBatch.Draw(tileImg, Grid[i, j].Rect, Color.Yellow);
                 }
@@ -304,16 +308,73 @@ public class Game1 : Game
                 }
                 else
                 {
-                    spriteBatch.Draw(tileImg, Grid[i, j].Rect, Color.White * opacity);
+                    spriteBatch.Draw(tileImg, Grid[i, j].Rect, Color.White * Superpositions[i, j]);
                 }
             }
         }
 
         spriteBatch.Draw(tileImg, uiBgRect, Color.Brown);
 
+        spriteBatch.DrawString(msgFont, INSTRUCTIONS_TEXT, instructionsTextPos, Color.White);
+
         spriteBatch.End();
 
         base.Draw(gameTime);
+    }
+
+    private void AddTwoPointSourceInterference()
+    {
+        ClearGrid();
+        
+        Grid[9, 0] = new Emitter(9, 0, new PropagationState[] { PropagationState.Right }, 1000);
+        Grid[15, 0] = new Emitter(15, 0, new PropagationState[] { PropagationState.Right }, 1000);
+
+        for (byte i = 0; i < 0 + 23; i++)
+        {
+            Grid[i, 13] = new AbsorbWall(i, 13);
+        }
+
+        for (byte i = 0; i < gridWidth; i++)
+        {
+            Grid[8, i] = new AbsorbWall(8, i);
+        }
+
+        for (byte i = 0; i < gridWidth; i++)
+        {
+            Grid[16, i] = new AbsorbWall(16, i);
+        }
+    }
+
+    private void AddDoubleSlit()
+    {
+        ClearGrid();
+
+        Grid[12, 7] = new Emitter(12, 7, new PropagationState[] { PropagationState.Right }, 500);
+
+        for (byte i = 5; i < 5 + 6; i++)
+        {
+            Grid[i, 12] = new AbsorbWall(i, 12);
+        }
+
+        for (byte i = 14; i < 13 + 6; i++)
+        {
+            Grid[i, 12] = new AbsorbWall(i, 12);
+        }
+
+        for (byte i = 1; i < 1 + 5; i++)
+        {
+            Grid[i, 16] = new AbsorbWall(i, 16);
+        }
+
+        for (byte i = 9; i < 9 + 5; i++)
+        {
+            Grid[i, 16] = new AbsorbWall(i, 16);
+        }
+
+        for (byte i = 17; i < 17 + 5; i++)
+        {
+            Grid[i, 16] = new AbsorbWall(i, 16);
+        }
     }
 
     //Pre: The mouse button number and the state of the mouse
@@ -368,5 +429,13 @@ public class Game1 : Game
     private static Tuple<byte, byte> MousePosToCoord(MouseState mouse)
     {
         return new Tuple<byte, byte>((byte)(mouse.Y / Tile.DIMENSION), (byte)(mouse.X / Tile.DIMENSION));
+    }
+
+    //Pre: The key to check the state of
+    //Post: A boolean representing if it was or was not pressed
+    //Desc: Checks to see if a key was just pressed
+    private bool NewKeyPress(Keys keyToCheck)
+    {
+        return kb.IsKeyDown(keyToCheck) && !prevKb.IsKeyDown(keyToCheck);
     }
 }

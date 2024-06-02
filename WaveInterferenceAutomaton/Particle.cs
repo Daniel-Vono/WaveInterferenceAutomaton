@@ -3,12 +3,6 @@
 // Description: One part of a wave which contains its own energy value
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-using Microsoft.Xna.Framework;
 
 public enum PropagationState
 {
@@ -30,7 +24,8 @@ class Particle
 
     private const float ENERGY_DISSIPATION = 0.75f;
     private const float ENERGY_DISSIPATION_DIAG = ENERGY_DISSIPATION * 0.85f;
-    private const float ENERGY_TOLERANCE = 0.005f; //0.005f;
+    private const float ENERGY_IMPROPER_DIR_MULTIPLIER = 0.25f;
+    private const float ENERGY_TOLERANCE = 0.005f;
 
     public byte UpdateId { get; private set; }
     private PropagationState emitterState;
@@ -39,7 +34,7 @@ class Particle
 
     public float ELevel { get; private set; }
 
-    public Particle(PropagationState state, PropagationState emitterState, float energyLevel, byte gridY, byte gridX, byte updateId)
+    public Particle(PropagationState state, PropagationState emitterState, float energyLevel, byte gridY, byte gridX, byte updateId, bool superpositionAccountedFor=true)
     {
         UpdateId = updateId;
 
@@ -48,6 +43,8 @@ class Particle
         ELevel = energyLevel;
 
         gridLoc = new Tuple<byte, byte>(gridY, gridX);
+
+        if(!superpositionAccountedFor) Game1.Superpositions[gridLoc.Item1, gridLoc.Item2] += ELevel;
     }
 
     private float CalcNewEnergyLevel()
@@ -136,15 +133,13 @@ class Particle
 
         if(similarDirection) return ELevel * ENERGY_DISSIPATION;
 
-        return ELevel * ENERGY_DISSIPATION * 0.25f;
+        return ELevel * ENERGY_DISSIPATION * ENERGY_IMPROPER_DIR_MULTIPLIER;
     }
 
     private void CopyParticle(PropagationState newState)
     {
-        //TODO: Check if valid indices
-
-        int yIndex;
-        int xIndex;
+        int yIndex = 0;
+        int xIndex = 0;
 
         switch (newState)
         {
@@ -228,12 +223,18 @@ class Particle
                 Game1.Grid[yIndex, xIndex].AddParticle(newState, emitterState, CalcNewEnergyLevel(), (byte)(UpdateId + 1));
                 break;
         }
+
+        if (!(Game1.Grid[yIndex, xIndex] is AbsorbWall)) Game1.Superpositions[yIndex, xIndex] += CalcNewEnergyLevel();
+        
     }
 
     public void Update()
     {
-        if (Math.Abs(ELevel) < ENERGY_TOLERANCE) 
+        if (Math.Abs(ELevel) < ENERGY_TOLERANCE)
+        {
+            Game1.Superpositions[gridLoc.Item1, gridLoc.Item2] -= ELevel;
             return;
+        }
 
         switch(state)
         {
@@ -285,6 +286,8 @@ class Particle
                 CopyParticle(PropagationState.Left);
                 break;
         }
+
+        Game1.Superpositions[gridLoc.Item1, gridLoc.Item2] -= ELevel;
     }
 }
 
